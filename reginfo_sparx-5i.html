@@ -1,0 +1,79 @@
+﻿<!DOCTYPE html>
+<html id="html" lang="en-US" style="height: 100%">
+<head>
+<meta charset="utf-8">
+<title id="title">Reg Info</title>
+
+<script src="reginfo_sparx-5i.js"></script>
+<script src="vml_browser.js"></script>
+<link rel="stylesheet" type="text/css" href="vml_browser.css">
+
+</head>
+<body onload="checkFilenameInput()" onresize="resize()" style="font-size: 12px; font-family:Tahoma, Geneva, sans-serif">
+
+<header>
+  <div style="position: relative; max-width: 1600px; margin-left: auto; margin-right: auto; margin-top: 16px;">
+    <h1 id="header" style="position: absolute; text-align: center; margin-top: 0; margin-bottom: 0;">Register Information</h1>
+  </div>
+  <h2 id="name" style="text-align: right; margin-top: 0; margin-bottom: 0;">&nbsp;</h2>
+  <p id="file" style="text-align: center; margin-top: 0; margin-bottom: 0; color: gray;"></p>
+</header>
+
+<div id="vml_errors" style="text-align: center; color: red"></div>
+
+<div id="vml_browser" style="display:none; max-width: 1600px; margin-left: auto; margin-right: auto;">
+  <div style="float: left; margin-right: 40px; min-width: 300px;">
+    <h2>Outline</h2>
+    <form action="javascript:vmlSearch(document.getElementById('vml_search').value, document.getElementById('vml_fulltext').checked)">
+      <input type="text" id="vml_search" style="width: 240px; margin-right: 8px;"><input type="submit" value="Search">
+      <br />
+      <input type="checkbox" id="vml_fulltext" style="vertical-align: middle"><label for="vml_fulltext">Full text search</label>
+    </form>
+    <div id="vml_expand"></div>
+    <div id="vml_outline" style="padding-right: 40px; overflow-y: auto; overflow-x: hidden; position: relative;"></div>
+  </div>
+  <div style="overflow: auto;">
+    <h2 id="vml_vheader"></h2>
+    <div id="vml_values" style="overflow: auto;"></div>
+  </div>
+</div>
+
+<footer>
+  <div style="position: relative; max-width: 1600px; margin-left: auto; margin-right: auto; margin-top: 16px;">
+    <p id="footer" style="position: absolute; right: 0px; bottom: 0px; margin-top: 0; margin-bottom: 0; color: gray;">
+    </p>
+  </div>
+</footer>
+
+
+<script type="text/javascript">
+  function resize() {
+    var html = document.getElementById('html');
+    var outline = document.getElementById('vml_outline');
+    var values = document.getElementById('vml_values');
+    outline.style.height = (html.offsetHeight - outline.offsetTop - 20) + "px";
+    values.style.height = (html.offsetHeight - values.offsetTop - 20) + "px";
+  }
+
+  function checkFilenameInput() {
+    var check = checkVMLFilenameInput();
+
+    if (regInfoProductName != "") {
+      document.getElementById('title').appendChild(document.createTextNode(' - '.concat(regInfoProductName)));
+      document.getElementById('header').appendChild(document.createTextNode(' for '.concat(regInfoProductName)));
+    }
+ 
+    document.getElementById('vml_errors').style.display = "none";
+    document.getElementById('vml_browser').style.display = "block";
+    resize();
+    vmlFocusOnSelected();
+    document.getElementById('vml_search').focus();
+    setFooter();
+  }
+
+  function setFooter() {
+    document.getElementById('footer').appendChild(document.createTextNode(regInfoFooter));
+  }
+</script>
+</body>
+</html>
