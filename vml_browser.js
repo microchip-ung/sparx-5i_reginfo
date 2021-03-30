@@ -283,14 +283,16 @@ function getName(node) {
 }
 
 function getReplications(node) {
-  return [node.getAttribute('vml_repl_min'), node.getAttribute('vml_repl_max')];
+  return [node.getAttribute('vml_repl_min'), 
+          node.getAttribute('vml_repl_max'), 
+          node.getAttribute('vml_repl_str')];
 }
 
 function getReplName(node) {
   var name = getName(node);
   var repl = getReplications(node);
   if (repl[1] != repl[0]) {
-    name += "[" + repl[0] + "-" + repl[1] + "]";
+    name += "[" + repl[2] + "]";
   } else if (repl[0] != 0) {
     name += "[" + repl[0] + "]";
   }
@@ -302,7 +304,8 @@ function getOutlineName(node, level) {
   var repl = getReplications(node, level);
   var outline_name = name;
   if (repl[1] != repl[0]) {
-    outline_name += "[" + repl[0] + "-" + repl[1] + "]";
+    // outline_name += "[" + repl[0] + "-" + repl[1] + "]";
+    outline_name += "[" + repl[2] + "]";
   } else if (repl[0] != 0) {
     outline_name += "[" + repl[0] + "]";
   }
@@ -411,6 +414,7 @@ function parseReplications(node, level) {
       var name = sim_nodes[0].getAttribute('name').replace(/_\d+$/, "");
       var repl_min = -1;
       var repl_max = 0;
+      var repl_list = [];
       var tgt_info_nodes = node.parentNode.parentNode.getElementsByTagName('target_info');
       for (var i = 0; i < tgt_info_nodes.length; i++) {
         var tgt_sim_nodes = tgt_info_nodes[i].getElementsByTagName('target_sim_info');
@@ -425,27 +429,77 @@ function parseReplications(node, level) {
           if (tgt_repl > repl_max) {
             repl_max = tgt_repl;
           }
+          repl_list.push(tgt_repl);
         }
       }
-      node.setAttribute('vml_repl_min', repl_min);
-      node.setAttribute('vml_repl_max', repl_max);
+      node.setAttribute('vml_repl_min',  repl_min);
+      node.setAttribute('vml_repl_max',  repl_max);
+      node.setAttribute('vml_repl_list', repl_list);
     } else {
       node.setAttribute('vml_repl_min', 0);
       node.setAttribute('vml_repl_max', 0);
+      node.setAttribute('vml_repl_list', [0]);
     }
   } else if (node.hasAttribute('repl_cnt')) {
     node.setAttribute('vml_repl_min', 0);
     var repl_cnt = parseInt(node.getAttribute('repl_cnt'));
+    var repl_list = [];
     if (isFinite(repl_cnt)) {
       node.setAttribute('vml_repl_max', repl_cnt - 1);
+      for (var i = 0; i < repl_cnt; i++) {
+        repl_list.push(i);
+      }
+      node.setAttribute('vml_repl_list', repl_list);
     } else {
-      node.setAttribute('vml_repl_max', 0);
+      node.setAttribute('vml_repl_max',  0);
+      node.setAttribute('vml_repl_list', [0]);
     }
   } else {
-    node.setAttribute('vml_repl_min', 0);
-    node.setAttribute('vml_repl_max', 0);
+    node.setAttribute('vml_repl_min',  0);
+    node.setAttribute('vml_repl_max',  0);
+    node.setAttribute('vml_repl_list', [0]);
   }
-}
+
+  var repl_min  = node.getAttribute('vml_repl_min');
+  var repl_max  = node.getAttribute('vml_repl_max');
+  var repl_list = (node.getAttribute('vml_repl_list')).split(",");
+
+  if (repl_list.length == repl_max - repl_min + 1) {
+    // Consecutive range
+    node.setAttribute('vml_repl_str', `${repl_min}-${repl_max}`);
+  } else {
+    // Non-consecutive range
+    var repl_str = "";
+    var first_range_idx = parseInt(repl_list[0]);
+    var prev_idx        = parseInt(repl_list[0]);
+    for (var i = 1; i < repl_list.length; i++) {
+      var idx = parseInt(repl_list[i]);
+      if (idx != prev_idx+1) {
+        if (repl_str != "") {
+          repl_str += ",";
+        }
+        repl_str += `${first_range_idx}-${prev_idx}`;
+
+        prev_idx        = idx;
+        first_range_idx = idx;
+      } else {
+        prev_idx = idx;
+      }
+      if (i == repl_list.length-1) {
+        // Last idx
+        if (repl_str != "") {
+          repl_str += ",";
+        }
+        if (first_range_idx == idx) {
+          repl_str += idx;
+        } else {
+          repl_str += first_range_idx + "-" + idx;
+        }
+      }
+    }
+    node.setAttribute('vml_repl_str', repl_str);
+  }
+} // parseReplications
 
 function parseHideTarget(node, level) {
   if (vmlType == "CML" && level == 1) {
@@ -753,8 +807,12 @@ function selectElement(e, updateHistory) {
       }
     }
   }
-  if (vmlFile != null && updateHistory) {
-    history.pushState(null, "", vmlBrowserUrl + "?file=" + vmlFile + "&select=" + vmlSelect.join(","));
+  if (customerMode() && updateHistory) {
+    history.pushState(null, "", vmlBrowserUrl + "?select=" + vmlSelect.join(","));
+  } else {
+    if (vmlFile != null && updateHistory) {
+      history.pushState(null, "", vmlBrowserUrl + "?file=" + vmlFile + "&select=" + vmlSelect.join(","));
+    }
   }
   createValueTable(node, ids.length - 1);
 }
@@ -1072,6 +1130,20 @@ function initVML(select) {
 
 function parseUrl() {
   var parts = document.location.href.split("?");
+
+  if (customerMode()) {
+    // No file in URL, but "?select=<target>[,<grp>[,<reg>[,<fld>]]]" may be present.
+    if (parts.length == 2) {
+      var args = parts[1].split("&");
+       if (args.length == 1) {
+         if (args[0].substr(0, 7) == "select=") {
+           vmlSelect = args[0].substr(7).toLowerCase().split(",");
+         }
+       }
+    }
+    return;
+  }  
+
   if (parts.length == 2) {
     var args = parts[1].split("&");
     if (args.length == 1 || args.length == 2) {
@@ -1158,9 +1230,7 @@ function getVMLFilename() {
 
 function loadVMLFile(file, select) {
   vml = null;
-  if (!customerMode()) {
-    vmlBrowserUrl = document.location.href.split("?")[0];
-  }
+  vmlBrowserUrl = document.location.href.split("?")[0];
   vmlFile = file;
   vmlSelect = [];
   vml = loadXMLDoc(file);
@@ -1174,6 +1244,7 @@ function loadVMLFile(file, select) {
 
 function checkVMLFilenameInput() {
   if (customerMode()) {
+    parseUrl();
     loadVMLFile(null, vmlSelect);
     if (vml != null) {
       return true;
